@@ -6,6 +6,8 @@
 #' @param convert do 1 - (expression_matrix_rank_median / nrow(expression_matrix)) ?
 #' @return  vector with median ranks per voxel and numeric ids as names
 #'
+#' @importFrom stats median
+#'
 #' @export
 #'
 #'
@@ -16,7 +18,7 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
   }
   # make ranks
   expression_matrix_rank = nrow(expression_matrix) - apply(expression_matrix,2,rank,ties="min")
-  expression_matrix_rank_median = apply(expression_matrix_rank,1,median)
+  expression_matrix_rank_median = apply(expression_matrix_rank,1,stats::median)
   names(expression_matrix_rank_median) = 1:nrow(expression_matrix_rank)
   # convert
   expression_matrix_rank_median = 1 - (expression_matrix_rank_median / nrow(expression_matrix))
@@ -28,12 +30,13 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #' Function uses column names of aba ish objects as provided when queried using cocoframer.
 #'
-#' @param expression_matrix e
+#' @param expression_matrix expression_matrix a matrix or dataframe with rows as voxels and columns as genes
 #' @param target_structure_id defaults to 1097 for hypothalamus. set to 997 for root!
-#' @param target_level
-#' @param enrich_function
-#' @param aba_ccf_grid_annotation
-#' @param  mba_ontology_flatten
+#' @param target_level number st_level in mba data (e.g. level 8 to provide a summary on this level)
+#' @param enrich_function a function (defaults to 'median_rank') for enrichment
+#' @param topn topn voxels to annotate region
+#' @param aba_ccf_grid_annotation a 3d array from cocoframer::get_ccf_grid_annotation() or a filepath to a rds containing a cached version. NULL will query the API
+#' @param  mba_ontology_flatten a dataframe from  cocoframer::get_mba_ontology() + cocoframer::flatten_mba_ontology() or a filepath to a tsv containing a cached version. NULL will query the API
 #' @return  vector with median ranks per voxel and numeric ids as names
 #'
 #' @export
@@ -42,7 +45,7 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #'
 
-region_annotation = function(expression_matrix,target_structure_id = "1097",target_level = "8",enrich_function = "median_rank", aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
+region_annotation = function(expression_matrix,target_structure_id = "1097",target_level = "8",enrich_function = "median_rank",topn=Inf, aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
 
   # get ccf grid as 3d array
   if(!is.null(aba_ccf_grid_annotation)){
@@ -53,8 +56,8 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
       }else{
         stop("Detected string to cached file provided via aba_ccf_grid_annotation but cannot find file. Please provide a correct path, a valid array or set to NULL to query via the API.")
       }
-    }else if(is.array(aba_gene_to_id)){
-
+    }else if(is.array(aba_ccf_grid_annotation)){
+      # do nothing
     }else{
       stop("Not a 3d array or string.  Please provide a correct path, a valid array or set to NULL to query via the API.")
     }
@@ -131,16 +134,93 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
 
   # group for output object
   return_list = list(
-   # return matrix with scores
+    # return matrix with scores
     genes_per_voxel = expression_matrix_subset_res,
-   # return all_target_voxels
+    # return all_target_voxels
     scores_per_voxel_annotated = all_target_voxels %>% as.data.frame(),
-   # return summary per ..
-   scores_per_leaf_region = all_target_voxels_summarize,
-   # return per target region
-   scores_per_target_level_region = all_target_voxels_summarize_targetlevel
+    # return summary per ..
+    scores_per_leaf_region = all_target_voxels_summarize,
+    # return per target region
+    scores_per_target_level_region = all_target_voxels_summarize_targetlevel
   )
   return(return_list)
+}
+
+## need wrapper functio(s)
+# execute above pipeline for sets of marker genes and store (intermediate) results
+# need to allow confidence measure based on detected genes
+
+
+#' Annotate sets of cluster Markers with regions
+#'
+#' @param gene_set gene set(s)
+#' @param aba_gene_to_id ..
+#' @param aba_ish_matrix ..
+#' @param ... parameters pass down
+#' @return  vector with all_children from nodes
+#'
+#' @export
+#'
+#'
+
+findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
+
+  # check whether gene_set is generally valid input
+  if(is.list(gene_set)){
+    if(any(!sapply(gene_set,is.character))){
+      stop("Please provide a character vector or a list of character vectors with mouse gene symbols" )
+    }
+  }else{
+    if(is.character(gene_set)){
+      gene_set = list(gene_set = gene_set)
+    }else{
+      stop("Please provide a character vector or a list of character vectors with mouse gene symbols" )
+    }
+  }
+
+  ## init lists for results:
+  genes_per_voxel_list =list()
+  scores_per_voxel_annotated_list =list()
+  scores_per_leaf_region_list =list()
+  scores_per_target_level_region_list =list()
+
+  ## run over all entries
+  for(i in 1:length(gene_set)){
+
+    # get
+    ids_to_query = aba_ids(gene_set[[i]],aba_gene_to_id = aba_gene_to_id)
+    if(length(ids_to_query)==0){
+      message("Cannot find any ids for gene in set ",names(gene_set)[i])
+    }else{
+      message(gene_set[i])
+      # get expression
+      aba_expression = coco_expression(ids = ids_to_query,aba_ish_matrix = aba_ish_matrix,return = "matrix")
+      temp_res = region_annotation(expression_matrix = aba_expression, ...)
+      # save in individual lists
+      genes_per_voxel_list[[names(gene_set)[i]]] = temp_res$genes_per_voxel
+      scores_per_voxel_annotated_list[[names(gene_set)[i]]] = temp_res$scores_per_voxel_annotated
+      scores_per_leaf_region_list[[names(gene_set)[i]]] = temp_res$scores_per_leaf_region
+      scores_per_target_level_region_list[[names(gene_set)[i]]] = temp_res$scores_per_target_level_region
+    }
+  }
+
+  # bind matrices
+  templist = lapply(scores_per_leaf_region_list,function(x){x[,3]})
+  tempmat = do.call(cbind,templist)
+  scores_per_leaf_region_all = cbind(scores_per_leaf_region_list[[1]][,1:2],tempmat)
+  templist = lapply(scores_per_target_level_region_list,function(x){x[,3]})
+  tempmat = do.call(cbind,templist)
+  scores_per_target_level_region_all = cbind(scores_per_target_level_region_list[[1]][,1:2],tempmat)
+
+  # make return object
+  return_list =list(
+    scores_per_leaf_region_all = scores_per_leaf_region_all,
+    scores_per_target_level_region_all = scores_per_target_level_region_all,
+    scores_per_voxel_annotated_list = scores_per_voxel_annotated_list,
+    genes_per_voxel_list = genes_per_voxel_list
+  )
+  return(return_list)
+
 }
 
 #' Recursive helper function for graph traversal
@@ -165,11 +245,9 @@ find_children = function(nodes,edges){
 }
 
 ## summarise to dataframe function:
-  ## need function that returns likely and other clusters as data.frame
+## need function that returns likely and other clusters as data.frame
 
-## need wrapper functio(s)
-  # execute above pipeline for sets of marker genes and store (intermediate) results
-  # need to allow confidence measure based on detected genes
+
 
 
 
