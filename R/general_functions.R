@@ -24,11 +24,13 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
   return(expression_matrix_rank_median)
 }
 
-#' Median rank across a matrix of gene expression
+#' Annotate regions via voxels using ABA ISH expression data and an enrichment function.
 #'
+#' Function uses column names of aba ish objects as provided when queried using cocoframer.
 #'
 #' @param expression_matrix e
 #' @param target_structure_id defaults to 1097 for hypothalamus. set to 997 for root!
+#' @param target_level
 #' @param enrich_function
 #' @param aba_ccf_grid_annotation
 #' @param  mba_ontology_flatten
@@ -40,7 +42,7 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #'
 
-region_annotation = function(expression_matrix,target_structure_id = "1097",enrich_function = "median_rank", aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
+region_annotation = function(expression_matrix,target_structure_id = "1097",target_level = "8",enrich_function = "median_rank", aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
 
   # get ccf grid as 3d array
   if(!is.null(aba_ccf_grid_annotation)){
@@ -66,7 +68,7 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",enri
     # query from provided or loaded file
     if(is.character(mba_ontology_flatten)){
       if(file.exists(mba_ontology_flatten)){
-        mba_ontology_flatten = data.table::fread(mba_ontology_flatte,data.table = FALSE,header = TRUE)
+        mba_ontology_flatten = data.table::fread(mba_ontology_flatten,data.table = FALSE,header = TRUE)
       }else{
         stop("Detected string to cached file provided via mba_ontology_flatten but cannot find file. Please provide a correct path, a valid data.frame or set to NULL to query via the API.")
       }
@@ -79,10 +81,11 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",enri
     # api query
     mba_ontology = cocoframer::get_mba_ontology()
     mba_ontology_flatten = cocoframer::flatten_mba_ontology(mba_ontology)
-    mba_ontology_flatten$parent_structure_id = as.character(mba_ontology_flatten$parent_structure_id)
-    mba_ontology_flatten$atlas_id = as.character(mba_ontology_flatten$atlas_id)
-    mba_ontology_flatten$id = as.character(mba_ontology_flatten$id)
   }
+  # set some ids to character
+  mba_ontology_flatten$parent_structure_id = as.character(mba_ontology_flatten$parent_structure_id)
+  mba_ontology_flatten$atlas_id = as.character(mba_ontology_flatten$atlas_id)
+  mba_ontology_flatten$id = as.character(mba_ontology_flatten$id)
 
   # find all children for selected node to subset
   # hypothalamus specific structures:
@@ -104,12 +107,40 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",enri
   all_target_voxels$score = score_subset
 
   # convert to matrix per region
-  all_target_voxels_summarize = all_target_voxels %>% dplyr::group_by(structure_id) %>% dplyr::slice_max(order_by = score,n=topn) %>% dplyr::summarise(region_median = median(score))
+  all_target_voxels_summarize = all_target_voxels %>% dplyr::group_by(structure_id,name) %>% dplyr::slice_max(order_by = score,n=topn) %>%
+    dplyr::summarise(region_median = median(score)) %>% suppressMessages() %>% as.data.frame()
 
   # further summarize to specific level
+  mba_ontology_flatten$st_level = as.numeric(mba_ontology_flatten$st_level)
+  structures_on_target_level = find_children(nodes=target_structure_id,edges=mba_ontology_flatten_edges[mba_ontology_flatten$st_level <= as.numeric(target_level),])
+  structures_on_target_level = structures_on_target_level[structures_on_target_level %in% mba_ontology_flatten$id[mba_ontology_flatten$st_level == as.numeric(target_level)]]
+  structures_on_target_level_withchildren = sapply(structures_on_target_level,find_children,edges = mba_ontology_flatten_edges)
+  structures_on_target_level_withchildren = sapply(names(structures_on_target_level_withchildren),function(name,list){c(name,list[[name]])},list=structures_on_target_level_withchildren)
+  structures_on_target_level_withchildren_df = lapply(names(structures_on_target_level_withchildren),function(name,list){df = data.frame(subnodes = list[[name]], topnode = name);return(df)},list=structures_on_target_level_withchildren)
+  structures_on_target_level_withchildren_df = do.call(rbind.data.frame,structures_on_target_level_withchildren_df) %>% dplyr::filter(topnode %in% structures_on_target_level)
+  ## add to voxel df
+  all_target_voxels =  dplyr::left_join(all_target_voxels,structures_on_target_level_withchildren_df,by=c("structure_id"="subnodes"))
+  all_target_voxels$topnode[is.na(all_target_voxels$topnode)] = all_target_voxels$structure_id[is.na(all_target_voxels$topnode)]
+  all_target_voxels = dplyr::left_join(all_target_voxels,mba_ontology_flatten %>% dplyr::select(id, topname = name),by=c("topnode"="id"))
+  # further sum
+  all_target_voxels_summarize_targetlevel = all_target_voxels %>% dplyr::group_by(topnode,topname) %>% dplyr::slice_max(order_by = score,n=topn) %>%
+    dplyr::summarise(region_median = median(score)) %>% suppressMessages() %>% as.data.frame()
+
+  # make annotated version of expression matrix
+  expression_matrix_subset_res = cbind(voxel_id = rownames(expression_matrix_subset),expression_matrix_subset)
 
   # group for output object
-
+  return_list = list(
+   # return matrix with scores
+    genes_per_voxel = expression_matrix_subset_res,
+   # return all_target_voxels
+    scores_per_voxel_annotated = all_target_voxels %>% as.data.frame(),
+   # return summary per ..
+   scores_per_leaf_region = all_target_voxels_summarize,
+   # return per target region
+   scores_per_target_level_region = all_target_voxels_summarize_targetlevel
+  )
+  return(return_list)
 }
 
 #' Recursive helper function for graph traversal

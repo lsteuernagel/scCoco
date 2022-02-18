@@ -91,11 +91,11 @@ coco_expression = function(ids,return="matrix",aba_ish_list=NULL,aba_ish_matrix 
       }
     }else if(is.matrix(aba_ish_matrix) | is.data.frame(aba_ish_matrix)){
       aba_ish_res = aba_ish_matrix
-      top_convert =TRUE
+      stop_convert =TRUE
     }else{
       stop("Not a matrix or string.  Please provide a correct path, a valid matrix or set to NULL to query via the API.")
     }
-    aba_ish_res = aba_ish_res[,ids]
+    aba_ish_res = aba_ish_res[,ids,drop=FALSE]
     # else load or use rds list if provided
   }else if(!is.null(aba_ish_list) & is.null(aba_ish_matrix)){
     # load list
@@ -109,10 +109,19 @@ coco_expression = function(ids,return="matrix",aba_ish_list=NULL,aba_ish_matrix 
     }else{
       stop("Not a matrix or string.  Please provide a correct path, a valid matrix or set to NULL to query via the API.")
     }
-    aba_ish_res = aba_ish_res[ids]
+    if(length(ids)==1){
+      aba_ish_res=list(aba_ish_res[ids])
+      names(aba_ish_res) = ids
+    }else{
+      aba_ish_res = aba_ish_res[ids]
+    }
   }
   if(return == "matrix" & !stop_convert){
-    aba_ish_res = as.data.frame(do.call(cbind,aba_ish_res))
+    if(length(aba_ish_res)>1){
+      aba_ish_res = as.data.frame(do.call(cbind,aba_ish_res))
+    }else{
+      aba_ish_res = as.data.frame(aba_ish_res)
+    }
   }
   return(aba_ish_res)
 }
