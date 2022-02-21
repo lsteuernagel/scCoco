@@ -24,5 +24,5 @@ findRegions_genesets(
 vector with all_children from nodes
 }
 \description{
-Annotate sets of cluster Markers with regions
+TODO:need to allow confidence measure based on detected genes
 }

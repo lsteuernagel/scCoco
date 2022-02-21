@@ -8,7 +8,9 @@
 #'
 #' @export
 #'
-#' @import cocoframer data.table
+#' @import cocoframer
+#'
+#' @importFrom data.table fwrite
 #'
 #
 
@@ -60,7 +62,9 @@ aba_ids =  function(genes, aba_gene_to_id =NULL){
 #'
 #' @export
 #'
-#' @import cocoframer data.table
+#' @import cocoframer
+#'
+#' @importFrom data.table fwrite
 #'
 
 coco_expression = function(ids,return="matrix",aba_ish_list=NULL,aba_ish_matrix = NULL){

@@ -41,7 +41,9 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #' @export
 #'
-#' @import dplyr data.table
+#' @import dplyr
+#'
+#' @importFrom data.table fwrite
 #'
 #'
 
@@ -146,12 +148,9 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
   return(return_list)
 }
 
-## need wrapper functio(s)
-# execute above pipeline for sets of marker genes and store (intermediate) results
-# need to allow confidence measure based on detected genes
-
-
 #' Annotate sets of cluster Markers with regions
+#'
+#' TODO:need to allow confidence measure based on detected genes
 #'
 #' @param gene_set gene set(s)
 #' @param aba_gene_to_id ..
@@ -223,6 +222,26 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
 
 }
 
+#' Annotate sets of cluster Markers with regions
+#'
+#' TODO: summarise to dataframe function:
+#' need function that returns likely and other clusters as data.frame
+#'
+#' @param gene_set gene set(s)
+#' @param findRegion_result result list from findRegions_genesets
+#' @return  vector with all_children from nodes
+#'
+#' @export
+#'
+#'
+
+summariseRegions_genesets = function(gene_set, findRegion_result){
+  # TODO
+  # ....
+
+
+}
+
 #' Recursive helper function for graph traversal
 #'
 #' @param nodes starting node(s)
@@ -244,8 +263,6 @@ find_children = function(nodes,edges){
   return(all_children)
 }
 
-## summarise to dataframe function:
-## need function that returns likely and other clusters as data.frame
 
 
 
