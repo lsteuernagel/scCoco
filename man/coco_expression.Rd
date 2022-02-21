@@ -14,15 +14,15 @@ coco_expression(
 \arguments{
 \item{ids}{a vector of aba ids}
 
-\item{return}{should the function return list or matrix (see below)}
+\item{return}{'matrix' or 'list'. Should the function return a list of 3d arrays or a matrix ? (see also other parameters)}
 
-\item{aba_ish_list}{a list of 3d arrays or a string to a cached version (.rds)}
+\item{aba_ish_list}{a list of 3d arrays for each id in the mouse brain atlas a string to a cached version (.rds). If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids.}
 
-\item{aba_ish_matrix}{a voxel x gene matrix or a string to a cached version (table)}
+\item{aba_ish_matrix}{a voxel x gene matrix or a string to a cached version (table) If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids. If a matrix is provided it will always return a matrix.}
 }
 \value{
 a list or matrix depending on return
 }
 \description{
-Retrieves expression data per voxel.
+Retrieves expression data per voxel. Provide wither a list or a matrix with cached values for all ids or the function will query the Allen brain atlas API using cocoframer.
 }

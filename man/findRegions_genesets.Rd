@@ -2,7 +2,7 @@
 % Please edit documentation in R/general_functions.R
 \name{findRegions_genesets}
 \alias{findRegions_genesets}
-\title{Annotate sets of cluster Markers with regions}
+\title{Annotate sets of genes (cluster Markers) with mouse brain regions}
 \usage{
 findRegions_genesets(
   gene_set,
@@ -12,17 +12,17 @@ findRegions_genesets(
 )
 }
 \arguments{
-\item{gene_set}{gene set(s)}
+\item{gene_set}{gene set(s). A list of character vectors}
 
-\item{aba_gene_to_id}{..}
+\item{aba_gene_to_id}{a dataframe ('id','gene_symbol'), a filepath to a valid dataframe that can be read with data.table::fread or NULL. if NULL: will use cocoframer::get_gene_aba_ish_ids to query}
 
-\item{aba_ish_matrix}{..}
+\item{aba_ish_matrix}{a voxel x gene matrix or a string to a cached version (table) If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids. If a matrix is provided it will always return a matrix.}
 
-\item{...}{parameters pass down}
+\item{...}{parameters passed down to \code{\link{region_annotation}}}
 }
 \value{
-vector with all_children from nodes
+a list with results
 }
 \description{
-TODO:need to allow confidence measure based on detected genes
+TODO: need to explain all results in details
 }

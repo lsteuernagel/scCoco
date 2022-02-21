@@ -148,15 +148,15 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
   return(return_list)
 }
 
-#' Annotate sets of cluster Markers with regions
+#' Annotate sets of genes (cluster Markers) with mouse brain regions
 #'
-#' TODO:need to allow confidence measure based on detected genes
+#' TODO: need to explain all results in details
 #'
-#' @param gene_set gene set(s)
-#' @param aba_gene_to_id ..
-#' @param aba_ish_matrix ..
-#' @param ... parameters pass down
-#' @return  vector with all_children from nodes
+#' @param gene_set gene set(s). A list of character vectors
+#' @inheritParams coco_expression
+#' @inheritParams aba_ids
+#' @param ... parameters passed down to \code{\link{region_annotation}}
+#' @return  a list with results
 #'
 #' @export
 #'
@@ -179,6 +179,7 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
 
   ## init lists for results:
   genes_per_voxel_list =list()
+  pct_of_genes_list =list()
   scores_per_voxel_annotated_list =list()
   scores_per_leaf_region_list =list()
   scores_per_target_level_region_list =list()
@@ -188,6 +189,7 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
 
     # get
     ids_to_query = aba_ids(gene_set[[i]],aba_gene_to_id = aba_gene_to_id)
+    pct_of_genes_list[[names(gene_set)[i]]] = length(unique(names(ids_to_query))) / length(unique(gene_set[[i]]))
     if(length(ids_to_query)==0){
       message("Cannot find any ids for gene in set ",names(gene_set)[i])
     }else{
@@ -210,13 +212,16 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
   templist = lapply(scores_per_target_level_region_list,function(x){x[,3]})
   tempmat = do.call(cbind,templist)
   scores_per_target_level_region_all = cbind(scores_per_target_level_region_list[[1]][,1:2],tempmat)
+  # pct of genes as QC metric:
+  pct_of_genes_all = do.call(rbind,pct_of_genes_list)
 
   # make return object
   return_list =list(
     scores_per_leaf_region_all = scores_per_leaf_region_all,
     scores_per_target_level_region_all = scores_per_target_level_region_all,
     scores_per_voxel_annotated_list = scores_per_voxel_annotated_list,
-    genes_per_voxel_list = genes_per_voxel_list
+    genes_per_voxel_list = genes_per_voxel_list,
+    pct_of_genes_included = pct_of_genes_all
   )
   return(return_list)
 

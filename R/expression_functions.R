@@ -1,10 +1,10 @@
-#' retrieve aba ids for a vector of genes
+#' Retrieve aba ids for a vector of genes
 #'
-#' retreives all ids associated with provided ids. Genes that are not included in aba will be silently dropped!
+#' Retrieves all ids associated with provided ids. Genes that are not included in aba will be silently dropped!
 #'
 #' @param genes a vector of gene symbols
-#' @param aba_gene_to_id a dataframe ('id','gene_symbol'), a filepath to a valid dataframe or NULL. if NULL: will use cocoframer to query
-#' @return  vector with ids and genes as names
+#' @param aba_gene_to_id a dataframe ('id','gene_symbol'), a filepath to a valid dataframe that can be read with data.table::fread or NULL. if NULL: will use cocoframer::get_gene_aba_ish_ids to query
+#' @return  vector with (mba) ids and genes as names
 #'
 #' @export
 #'
@@ -52,12 +52,12 @@ aba_ids =  function(genes, aba_gene_to_id =NULL){
 
 #' Retrieve aba expression data per voxel for given ids
 #'
-#' Retrieves expression data per voxel.
+#' Retrieves expression data per voxel. Provide wither a list or a matrix with cached values for all ids or the function will query the Allen brain atlas API using cocoframer.
 #'
 #' @param ids a vector of aba ids
-#' @param return should the function return list or matrix (see below)
-#' @param aba_ish_list a list of 3d arrays or a string to a cached version (.rds)
-#' @param aba_ish_matrix a voxel x gene matrix or a string to a cached version (table)
+#' @param return 'matrix' or 'list'. Should the function return a list of 3d arrays or a matrix ? (see also other parameters)
+#' @param aba_ish_list a list of 3d arrays for each id in the mouse brain atlas a string to a cached version (.rds). If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids.
+#' @param aba_ish_matrix a voxel x gene matrix or a string to a cached version (table) If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids. If a matrix is provided it will always return a matrix.
 #' @return  a list or matrix depending on return
 #'
 #' @export
