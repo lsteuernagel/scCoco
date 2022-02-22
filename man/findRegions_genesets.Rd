@@ -6,6 +6,7 @@
 \usage{
 findRegions_genesets(
   gene_set,
+  min_ids = 0,
   aba_gene_to_id = NULL,
   aba_ish_matrix = NULL,
   ...
@@ -13,6 +14,8 @@ findRegions_genesets(
 }
 \arguments{
 \item{gene_set}{gene set(s). A list of character vectors}
+
+\item{min_ids}{for quality control (pct_of_genes): How many ids should be included in the calculation. else pct_of_genes will be 0}
 
 \item{aba_gene_to_id}{a dataframe ('id','gene_symbol'), a filepath to a valid dataframe that can be read with data.table::fread or NULL. if NULL: will use cocoframer::get_gene_aba_ish_ids to query}
 

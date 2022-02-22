@@ -32,22 +32,23 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #' @param expression_matrix expression_matrix a matrix or dataframe with rows as voxels and columns as genes
 #' @param target_structure_id defaults to 1097 for hypothalamus. set to 997 for root!
+#' @param exclude_ids mba structure ids to exclude. defaults to subfornical organ
 #' @param target_level number st_level in mba data (e.g. level 8 to provide a summary on this level)
 #' @param enrich_function a function (defaults to 'median_rank') for enrichment
-#' @param topn topn voxels to annotate region
+#' @param topn topn voxels to annotate region. defaults to 10. set to inf if not filtering for averaging is desired
 #' @param aba_ccf_grid_annotation a 3d array from cocoframer::get_ccf_grid_annotation() or a filepath to a rds containing a cached version. NULL will query the API
 #' @param  mba_ontology_flatten a dataframe from  cocoframer::get_mba_ontology() + cocoframer::flatten_mba_ontology() or a filepath to a tsv containing a cached version. NULL will query the API
 #' @return  vector with median ranks per voxel and numeric ids as names
 #'
 #' @export
 #'
-#' @import dplyr
+#' @import dplyr magrittr
 #'
 #' @importFrom data.table fwrite
 #'
 #'
 
-region_annotation = function(expression_matrix,target_structure_id = "1097",target_level = "8",enrich_function = "median_rank",topn=Inf, aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
+region_annotation = function(expression_matrix,target_structure_id = "1097",exclude_ids = c("338"),target_level = "8",enrich_function = "median_rank",topn=10, aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
 
   # get ccf grid as 3d array
   if(!is.null(aba_ccf_grid_annotation)){
@@ -96,6 +97,9 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
   # hypothalamus specific structures:
   mba_ontology_flatten_edges = data.frame(from=as.character(mba_ontology_flatten$parent_structure_id), to = as.character(mba_ontology_flatten$id),stringsAsFactors = F)
   target_structure_children = find_children(mba_ontology_flatten$id[mba_ontology_flatten$id %in% target_structure_id],edges = mba_ontology_flatten_edges)
+
+  # exclude
+  target_structure_children = target_structure_children[! as.character(target_structure_children) %in% as.character(exclude_ids)]
 
   # take voxel anno and mba_flattened
   full_annotation = data.frame(voxel_id = 1:nrow(expression_matrix),structure_id = as.character(aba_ccf_grid_annotation))
@@ -153,6 +157,7 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
 #' TODO: need to explain all results in details
 #'
 #' @param gene_set gene set(s). A list of character vectors
+#' @param min_ids for quality control (pct_of_genes): How many ids should be included in the calculation. else pct_of_genes will be 0
 #' @inheritParams coco_expression
 #' @inheritParams aba_ids
 #' @param ... parameters passed down to \code{\link{region_annotation}}
@@ -162,7 +167,7 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",targ
 #'
 #'
 
-findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
+findRegions_genesets = function(gene_set,min_ids = 0, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
 
   # check whether gene_set is generally valid input
   if(is.list(gene_set)){
@@ -183,17 +188,25 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
   scores_per_voxel_annotated_list =list()
   scores_per_leaf_region_list =list()
   scores_per_target_level_region_list =list()
+  queried_genes_list = list()
+  ids_length_list = list()
 
   ## run over all entries
   for(i in 1:length(gene_set)){
 
     # get
     ids_to_query = aba_ids(gene_set[[i]],aba_gene_to_id = aba_gene_to_id)
-    pct_of_genes_list[[names(gene_set)[i]]] = length(unique(names(ids_to_query))) / length(unique(gene_set[[i]]))
-    if(length(ids_to_query)==0){
-      message("Cannot find any ids for gene in set ",names(gene_set)[i])
+    queried_genes_list[[names(gene_set)[i]]] = unique(names(ids_to_query))
+    ids_length = length(unique(names(ids_to_query)))
+    ids_length_list[[names(gene_set)[i]]] = ids_length
+    if(ids_length < min_ids){
+      ids_length = 0
+    }
+    pct_of_genes_list[[names(gene_set)[i]]] = ids_length / length(unique(gene_set[[i]]))
+    if(length(ids_to_query) < 2){
+      message("Cannot find any (or only 1) ids for gene in set ",names(gene_set)[i])
     }else{
-      message(gene_set[i])
+      message("Running ",names(gene_set)[i]," with ",length(ids_to_query)," ids to query.")
       # get expression
       aba_expression = coco_expression(ids = ids_to_query,aba_ish_matrix = aba_ish_matrix,return = "matrix")
       temp_res = region_annotation(expression_matrix = aba_expression, ...)
@@ -212,8 +225,23 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
   templist = lapply(scores_per_target_level_region_list,function(x){x[,3]})
   tempmat = do.call(cbind,templist)
   scores_per_target_level_region_all = cbind(scores_per_target_level_region_list[[1]][,1:2],tempmat)
+
+  #### QC
   # pct of genes as QC metric:
-  pct_of_genes_all = do.call(rbind,pct_of_genes_list)
+  pct_of_genes_all = as.data.frame(do.call(rbind,pct_of_genes_list))
+  colnames(pct_of_genes_all) = "pct_of_genes"
+  pct_of_genes_all$number_genes = do.call(rbind,ids_length_list)[,1]
+  # overlap of lists
+  intersect_matrix = intersect_from_list(gene_set)
+  geneset_binary_dist = as.matrix(dist(t(intersect_matrix),method = "binary")) # return this!
+  # get the smallest dist
+  shortest_dists = apply(geneset_binary_dist,1,function(x){
+    second_lowest_dist = sort(x)[2]
+    names(second_lowest_dist) = names(x[which(x==second_lowest_dist)])[1]
+    second_lowest_dist
+  })
+  pct_of_genes_all$shortest_dist = shortest_dists
+  pct_of_genes_all$power = pct_of_genes_all$pct_of_genes * pct_of_genes_all$shortest_dist
 
   # make return object
   return_list =list(
@@ -221,7 +249,7 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
     scores_per_target_level_region_all = scores_per_target_level_region_all,
     scores_per_voxel_annotated_list = scores_per_voxel_annotated_list,
     genes_per_voxel_list = genes_per_voxel_list,
-    pct_of_genes_included = pct_of_genes_all
+    gene_set_power = pct_of_genes_all
   )
   return(return_list)
 
@@ -229,22 +257,49 @@ findRegions_genesets = function(gene_set, aba_gene_to_id =NULL, aba_ish_matrix =
 
 #' Annotate sets of cluster Markers with regions
 #'
-#' TODO: summarise to dataframe function:
-#' need function that returns likely and other clusters as data.frame
-#'
-#' @param gene_set gene set(s)
 #' @param findRegion_result result list from findRegions_genesets
+#' @param min_score min_score to filter for in findRegion_result enrichment (standard function return 0-1, and the default is set to 0.8)
 #' @return  vector with all_children from nodes
 #'
 #' @export
 #'
 #'
 
-summariseRegions_genesets = function(gene_set, findRegion_result){
-  # TODO
-  # ....
+summariseRegions_genesets = function(findRegion_result,min_score=0.8){
 
-
+  all_gene_sets = rownames(findRegion_result$gene_set_power)
+  result_region_list = list()
+  for(gene_set in all_gene_sets){
+    result_vec = vector()
+    result_vec["gene_set"] = gene_set
+    if(gene_set %in% colnames(findRegion_result$scores_per_leaf_region_all)){
+     # if(max(findRegion_result$scores_per_target_level_region_all[,gene_set])[1]>min_score){
+      # - Region (Target level)
+      result_vec["Region"] = findRegion_result$scores_per_target_level_region_all[which(findRegion_result$scores_per_target_level_region_all[,gene_set] == max(findRegion_result$scores_per_target_level_region_all[,gene_set]))[1],2]
+      # - Most likely region (all levels)
+      result_vec["Region_specific"] = findRegion_result$scores_per_leaf_region_all[which(findRegion_result$scores_per_leaf_region_all[,gene_set] == max(findRegion_result$scores_per_leaf_region_all[,gene_set]))[1],2]
+      result_vec["Region_specific_enrichment"] = findRegion_result$scores_per_leaf_region_all[which(findRegion_result$scores_per_leaf_region_all[,gene_set] == max(findRegion_result$scores_per_leaf_region_all[,gene_set]))[1],gene_set]
+      # - Other likely regions (all levels, cutoff ?)
+      top_5_scores = sort(findRegion_result$scores_per_leaf_region_all[,gene_set],decreasing = TRUE)[1:5]
+      top_5_scores = top_5_scores[top_5_scores>min_score]
+      top_5_scores = findRegion_result$scores_per_leaf_region_all[findRegion_result$scores_per_leaf_region_all[,gene_set] %in% top_5_scores,c(1,2,which(colnames(findRegion_result$scores_per_leaf_region_all)==gene_set))]
+      top_5_scores = top_5_scores[order(top_5_scores[,gene_set],decreasing=TRUE),]
+      result_vec["Region_specific_other"] = possible_regions = paste0(top_5_scores[-1,2],collapse = " | ")
+      # }else{
+      #   result_vec =c(result_vec,rep(NA,4))
+      #   names(result_vec)[2:5] = c("Region","Region_specific","Region_specific_enrichment","Region_specific_other")
+      # }
+    }else{
+      result_vec =c(result_vec,rep(NA,4))
+      names(result_vec)[2:5] = c("Region","Region_specific","Region_specific_enrichment","Region_specific_other")
+    }
+    # - Power of markers used.
+    result_vec["Region_confidence"] = findRegion_result$gene_set_power[gene_set,"power"]
+    # result
+    result_region_list[[gene_set]] = result_vec
+  }
+  result_region = as.data.frame(do.call(rbind,result_region_list))
+  return(result_region)
 }
 
 #' Recursive helper function for graph traversal
@@ -268,9 +323,30 @@ find_children = function(nodes,edges){
   return(all_children)
 }
 
+#' Helper function for list intersection
+#'
+#' Adapted from : UpSetR::fromList but extended with rownames
+#'
+#' @param input list of gene sets (or any sets)
+#' @return binary matrix of elements x sets
+#'
+#' @export
+#'
 
-
-
+intersect_from_list = function(input){
+  # this code is adapted from : UpSetR::fromList
+  elements <- unique(unlist(input))
+  data <- unlist(lapply(input, function(x) {
+    x <- as.vector(match(elements, x))
+  }))
+  data[is.na(data)] <- as.integer(0)
+  data[data != 0] <- as.integer(1)
+  data <- data.frame(matrix(data, ncol = length(input), byrow = F))
+  data <- data[which(rowSums(data) != 0), ]
+  names(data) <- names(input)
+  rownames(data) <- elements # added this to include rownames!
+  return(data)
+}
 
 
 

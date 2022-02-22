@@ -9,7 +9,7 @@ Authors@R:
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: What the package does (one paragraph).
 License: MIT + file LICENSE
-Imports: methods, dplyr, Matrix, cocoframer, data.table
+Imports: methods, magrittr, dplyr, Matrix, cocoframer, data.table
 Suggests: cubelyr
 Encoding: UTF-8
 LazyData: true

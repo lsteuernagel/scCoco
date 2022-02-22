@@ -4,17 +4,16 @@
 \alias{summariseRegions_genesets}
 \title{Annotate sets of cluster Markers with regions}
 \usage{
-summariseRegions_genesets(gene_set, findRegion_result)
+summariseRegions_genesets(findRegion_result, min_score = 0.8)
 }
 \arguments{
-\item{gene_set}{gene set(s)}
-
 \item{findRegion_result}{result list from findRegions_genesets}
+
+\item{min_score}{min_score to filter for in findRegion_result enrichment (standard function return 0-1, and the default is set to 0.8)}
 }
 \value{
 vector with all_children from nodes
 }
 \description{
-TODO: summarise to dataframe function:
-need function that returns likely and other clusters as data.frame
+Annotate sets of cluster Markers with regions
 }

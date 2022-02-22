@@ -7,6 +7,7 @@
 region_annotation(
   expression_matrix,
   target_structure_id = "1097",
+  exclude_ids = c("338"),
   target_level = "8",
   enrich_function = "median_rank",
   topn = Inf,
@@ -18,6 +19,8 @@ region_annotation(
 \item{expression_matrix}{expression_matrix a matrix or dataframe with rows as voxels and columns as genes}
 
 \item{target_structure_id}{defaults to 1097 for hypothalamus. set to 997 for root!}
+
+\item{exclude_ids}{mba structure ids to exclude. defaults to subfornical organ}
 
 \item{target_level}{number st_level in mba data (e.g. level 8 to provide a summary on this level)}
 
