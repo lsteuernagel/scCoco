@@ -238,9 +238,11 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
         if(length(weights_per_id) == ncol(aba_expression)){
           temp_res = region_annotation(expression_matrix = aba_expression, weights = weights_per_id,...)
         }else{
-          temp_res = region_annotation(expression_matrix = aba_expression, weights = weights_per_id, ...)
+          temp_res = region_annotation(expression_matrix = aba_expression, ...)
           message("Warning: Cannot apply weights: different lengths.")
         }
+      }else{
+        temp_res = region_annotation(expression_matrix = aba_expression, ...)
       }
       # save in individual lists
       genes_per_voxel_list[[names(gene_set)[i]]] = temp_res$genes_per_voxel
