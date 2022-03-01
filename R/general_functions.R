@@ -4,6 +4,7 @@
 #' @param expression_matrix expression_matrix a matrix or dataframe with rows as voxels and columns as genes
 #' @param subset numeric vector of ids to subset matrix to. defaults to NULL (no subset)
 #' @param convert do 1 - (expression_matrix_rank_median / nrow(expression_matrix)) ?
+#' @param weights weights for ids
 #' @return  vector with median ranks per voxel and numeric ids as names
 #'
 #' @importFrom stats median
@@ -12,16 +13,23 @@
 #'
 #'
 #
-median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
+median_rank = function(expression_matrix,subset=NULL,convert =TRUE,weights=NULL){
   if(!is.null(subset)){
     expression_matrix = expression_matrix[subset,]
   }
   # make ranks
   expression_matrix_rank = nrow(expression_matrix) - apply(expression_matrix,2,rank,ties="min")
+  if(!is.null(weights)){
+    weights = ceiling(weights)
+    repeated_colnames = rep(colnames(expression_matrix_rank),weights)
+    expression_matrix_rank = expression_matrix_rank[,repeated_colnames]
+  }
   expression_matrix_rank_median = apply(expression_matrix_rank,1,stats::median)
   names(expression_matrix_rank_median) = 1:nrow(expression_matrix_rank)
   # convert
-  expression_matrix_rank_median = 1 - (expression_matrix_rank_median / nrow(expression_matrix))
+  if(convert){
+    expression_matrix_rank_median = 1 - (expression_matrix_rank_median / nrow(expression_matrix))
+  }
   #return(expression_matrix_rank_median)
   return(expression_matrix_rank_median)
 }
@@ -31,7 +39,8 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #' Function uses column names of aba ish objects as provided when queried using cocoframer.
 #'
 #' @param expression_matrix expression_matrix a matrix or dataframe with rows as voxels and columns as genes
-#' @param target_structure_id defaults to 1097 for hypothalamus. set to 997 for root!
+#' @param weights weights for ids (columns in expression_matrix). provide null for unweighted
+#' @param target_structure_id defaults to 997 for hypothalamus. set to 1097 for hypothalamus.!
 #' @param exclude_ids mba structure ids to exclude. defaults to subfornical organ
 #' @param target_level number st_level in mba data (e.g. level 8 to provide a summary on this level)
 #' @param enrich_function a function (defaults to 'median_rank') for enrichment
@@ -48,7 +57,7 @@ median_rank = function(expression_matrix,subset=NULL,convert =TRUE){
 #'
 #'
 
-region_annotation = function(expression_matrix,target_structure_id = "1097",exclude_ids = c("338"),target_level = "8",enrich_function = "median_rank",topn=10, aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
+region_annotation = function(expression_matrix,weights=NULL,target_structure_id = "997",exclude_ids = c("338"),target_level = "8",enrich_function = "median_rank",topn=10, aba_ccf_grid_annotation = NULL ,mba_ontology_flatten= NULL){
 
   # get ccf grid as 3d array
   if(!is.null(aba_ccf_grid_annotation)){
@@ -109,7 +118,7 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",excl
 
   # run scoring function:
   enrich_function = match.fun(enrich_function)
-  score_subset = enrich_function(expression_matrix_subset,convert=TRUE)
+  score_subset = enrich_function(expression_matrix_subset,convert=TRUE,weights=weights)
 
   # result
   all_target_voxels = full_annotation[which(full_annotation$structure_id %in% target_structure_children),]
@@ -121,8 +130,15 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",excl
 
   # further summarize to specific level
   mba_ontology_flatten$st_level = as.numeric(mba_ontology_flatten$st_level)
-  structures_on_target_level = find_children(nodes=target_structure_id,edges=mba_ontology_flatten_edges[mba_ontology_flatten$st_level <= as.numeric(target_level),])
-  structures_on_target_level = structures_on_target_level[structures_on_target_level %in% mba_ontology_flatten$id[mba_ontology_flatten$st_level == as.numeric(target_level)]]
+
+  # this version also includes cases where the tree jumps over the target lvele , i.e. a parent only having children on alevel below (the these will be included too!)
+  structures_selected = find_children(nodes=target_structure_id,edges=mba_ontology_flatten_edges)
+  structures_above_target_level = structures_selected[structures_selected %in% mba_ontology_flatten$id[mba_ontology_flatten$st_level < as.numeric(target_level)]]
+  children_structures_above_target_level =  mba_ontology_flatten_edges$to[mba_ontology_flatten_edges$from %in%structures_above_target_level]
+  structures_on_target_level = children_structures_above_target_level[children_structures_above_target_level %in% mba_ontology_flatten$id[mba_ontology_flatten$st_level >= as.numeric(target_level)]]
+
+  # get children of these into a list
+  structures_on_target_level = structures_on_target_level[structures_on_target_level %in% mba_ontology_flatten$id[mba_ontology_flatten$st_level >= as.numeric(target_level)]]
   structures_on_target_level_withchildren = sapply(structures_on_target_level,find_children,edges = mba_ontology_flatten_edges)
   structures_on_target_level_withchildren = sapply(names(structures_on_target_level_withchildren),function(name,list){c(name,list[[name]])},list=structures_on_target_level_withchildren)
   structures_on_target_level_withchildren_df = lapply(names(structures_on_target_level_withchildren),function(name,list){df = data.frame(subnodes = list[[name]], topnode = name);return(df)},list=structures_on_target_level_withchildren)
@@ -167,7 +183,7 @@ region_annotation = function(expression_matrix,target_structure_id = "1097",excl
 #'
 #'
 
-findRegions_genesets = function(gene_set,min_ids = 0, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
+findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
 
   # check whether gene_set is generally valid input
   if(is.list(gene_set)){
@@ -179,6 +195,12 @@ findRegions_genesets = function(gene_set,min_ids = 0, aba_gene_to_id =NULL, aba_
       gene_set = list(gene_set = gene_set)
     }else{
       stop("Please provide a character vector or a list of character vectors with mouse gene symbols" )
+    }
+  }
+
+  if(!is.null(gene_set_weights)){
+    if(any(!sapply(gene_set_weights,is.numeric))){
+      stop("Please provide a numeric vector or a list of numeric vectors with weights for each gene set" )
     }
   }
 
@@ -209,7 +231,17 @@ findRegions_genesets = function(gene_set,min_ids = 0, aba_gene_to_id =NULL, aba_
       message("Running ",names(gene_set)[i]," with ",length(ids_to_query)," ids to query.")
       # get expression
       aba_expression = coco_expression(ids = ids_to_query,aba_ish_matrix = aba_ish_matrix,return = "matrix")
-      temp_res = region_annotation(expression_matrix = aba_expression, ...)
+      # optionally apply weights
+      if(!is.null(gene_set_weights)){
+        weights = gene_set_weights[[i]]
+        weights_per_id = weights[match(names(ids_to_query),gene_set[[i]])]
+        if(length(weights_per_id) == ncol(aba_expression)){
+          temp_res = region_annotation(expression_matrix = aba_expression, weights = weights_per_id,...)
+        }else{
+          temp_res = region_annotation(expression_matrix = aba_expression, weights = weights_per_id, ...)
+          message("Warning: Cannot apply weights: different lengths.")
+        }
+      }
       # save in individual lists
       genes_per_voxel_list[[names(gene_set)[i]]] = temp_res$genes_per_voxel
       scores_per_voxel_annotated_list[[names(gene_set)[i]]] = temp_res$scores_per_voxel_annotated
@@ -273,7 +305,7 @@ summariseRegions_genesets = function(findRegion_result,min_score=0.8){
     result_vec = vector()
     result_vec["gene_set"] = gene_set
     if(gene_set %in% colnames(findRegion_result$scores_per_leaf_region_all)){
-     # if(max(findRegion_result$scores_per_target_level_region_all[,gene_set])[1]>min_score){
+      # if(max(findRegion_result$scores_per_target_level_region_all[,gene_set])[1]>min_score){
       # - Region (Target level)
       result_vec["Region"] = findRegion_result$scores_per_target_level_region_all[which(findRegion_result$scores_per_target_level_region_all[,gene_set] == max(findRegion_result$scores_per_target_level_region_all[,gene_set]))[1],2]
       # - Most likely region (all levels)
