@@ -176,6 +176,7 @@ region_annotation = function(expression_matrix,weights=NULL,target_structure_id 
 #' @param min_ids for quality control (pct_of_genes): How many ids should be included in the calculation. else pct_of_genes will be 0
 #' @inheritParams coco_expression
 #' @inheritParams aba_ids
+#' @param max_ids_to_include maximum of ids that will bes used fr enrichment. defaults to inf
 #' @param ... parameters passed down to \code{\link{region_annotation}}
 #' @return  a list with results
 #'
@@ -183,7 +184,7 @@ region_annotation = function(expression_matrix,weights=NULL,target_structure_id 
 #'
 #'
 
-findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_gene_to_id =NULL, aba_ish_matrix =NULL,...){
+findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_gene_to_id =NULL, aba_ish_matrix =NULL,max_ids_to_include = Inf,...){
 
   # check whether gene_set is generally valid input
   if(is.list(gene_set)){
@@ -212,6 +213,7 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
   scores_per_target_level_region_list =list()
   queried_genes_list = list()
   ids_length_list = list()
+  pct_of_weights_list =list()
 
   ## run over all entries
   for(i in 1:length(gene_set)){
@@ -224,6 +226,9 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
     if(ids_length < min_ids){
       ids_length = 0
     }
+    if(ids_length > max_ids_to_include){
+      ids_to_query = ids_to_query[1:max_ids_to_include]
+    }
     pct_of_genes_list[[names(gene_set)[i]]] = ids_length / length(unique(gene_set[[i]]))
     if(length(ids_to_query) < 2){
       message("Cannot find any (or only 1) ids for gene in set ",names(gene_set)[i])
@@ -235,13 +240,16 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
       if(!is.null(gene_set_weights)){
         weights = gene_set_weights[[i]]
         weights_per_id = weights[match(names(ids_to_query),gene_set[[i]])]
+        pct_of_weights_list[[names(gene_set)[i]]] = sum(weights_per_id) / sum(weights)
         if(length(weights_per_id) == ncol(aba_expression)){
           temp_res = region_annotation(expression_matrix = aba_expression, weights = weights_per_id,...)
         }else{
+          pct_of_weights_list[[names(gene_set)[i]]] = 1
           temp_res = region_annotation(expression_matrix = aba_expression, ...)
           message("Warning: Cannot apply weights: different lengths.")
         }
       }else{
+        pct_of_weights_list[[names(gene_set)[i]]] = 1
         temp_res = region_annotation(expression_matrix = aba_expression, ...)
       }
       # save in individual lists
@@ -264,7 +272,7 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
   # pct of genes as QC metric:
   pct_of_genes_all = as.data.frame(do.call(rbind,pct_of_genes_list))
   colnames(pct_of_genes_all) = "pct_of_genes"
-  pct_of_genes_all$number_genes = do.call(rbind,ids_length_list)[,1]
+  pct_of_genes_all$number_ids = do.call(rbind,ids_length_list)[,1]
   # overlap of lists
   intersect_matrix = intersect_from_list(gene_set)
   geneset_binary_dist = as.matrix(dist(t(intersect_matrix),method = "binary")) # return this!
@@ -275,7 +283,9 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
     second_lowest_dist
   })
   pct_of_genes_all$shortest_dist = shortest_dists
-  pct_of_genes_all$power = pct_of_genes_all$pct_of_genes * pct_of_genes_all$shortest_dist
+  pct_of_genes_all$pct_of_weights = do.call(rbind,pct_of_weights_list)[,1]
+
+  #pct_of_genes_all$power = pct_of_genes_all$pct_of_genes * pct_of_genes_all$shortest_dist
 
   # make return object
   return_list =list(
@@ -328,7 +338,7 @@ summariseRegions_genesets = function(findRegion_result,min_score=0.8){
       names(result_vec)[2:5] = c("Region","Region_specific","Region_specific_enrichment","Region_specific_other")
     }
     # - Power of markers used.
-    result_vec["Region_confidence"] = findRegion_result$gene_set_power[gene_set,"power"]
+    result_vec["Region_confidence"] = findRegion_result$gene_set_power[gene_set,"pct_of_genes"]
     # result
     result_region_list[[gene_set]] = result_vec
   }

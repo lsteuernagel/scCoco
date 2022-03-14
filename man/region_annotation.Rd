@@ -6,11 +6,12 @@
 \usage{
 region_annotation(
   expression_matrix,
-  target_structure_id = "1097",
+  weights = NULL,
+  target_structure_id = "997",
   exclude_ids = c("338"),
   target_level = "8",
   enrich_function = "median_rank",
-  topn = Inf,
+  topn = 10,
   aba_ccf_grid_annotation = NULL,
   mba_ontology_flatten = NULL
 )
@@ -18,7 +19,9 @@ region_annotation(
 \arguments{
 \item{expression_matrix}{expression_matrix a matrix or dataframe with rows as voxels and columns as genes}
 
-\item{target_structure_id}{defaults to 1097 for hypothalamus. set to 997 for root!}
+\item{weights}{weights for ids (columns in expression_matrix). provide null for unweighted}
+
+\item{target_structure_id}{defaults to 997 for hypothalamus. set to 1097 for hypothalamus.!}
 
 \item{exclude_ids}{mba structure ids to exclude. defaults to subfornical organ}
 
@@ -26,7 +29,7 @@ region_annotation(
 
 \item{enrich_function}{a function (defaults to 'median_rank') for enrichment}
 
-\item{topn}{topn voxels to annotate region}
+\item{topn}{topn voxels to annotate region. defaults to 10. set to inf if not filtering for averaging is desired}
 
 \item{aba_ccf_grid_annotation}{a 3d array from cocoframer::get_ccf_grid_annotation() or a filepath to a rds containing a cached version. NULL will query the API}
 

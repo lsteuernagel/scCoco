@@ -6,9 +6,11 @@
 \usage{
 findRegions_genesets(
   gene_set,
+  gene_set_weights = NULL,
   min_ids = 0,
   aba_gene_to_id = NULL,
   aba_ish_matrix = NULL,
+  max_ids_to_include = Inf,
   ...
 )
 }
@@ -20,6 +22,8 @@ findRegions_genesets(
 \item{aba_gene_to_id}{a dataframe ('id','gene_symbol'), a filepath to a valid dataframe that can be read with data.table::fread or NULL. if NULL: will use cocoframer::get_gene_aba_ish_ids to query}
 
 \item{aba_ish_matrix}{a voxel x gene matrix or a string to a cached version (table) If NULL, cocoframer::get_aba_ish_data will be used to retrieve 3 arrays for all provided ids. If a matrix is provided it will always return a matrix.}
+
+\item{max_ids_to_include}{maximum of ids that will bes used fr enrichment. defaults to inf}
 
 \item{...}{parameters passed down to \code{\link{region_annotation}}}
 }

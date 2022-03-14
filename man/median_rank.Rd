@@ -4,7 +4,7 @@
 \alias{median_rank}
 \title{Median rank across a matrix of gene expression}
 \usage{
-median_rank(expression_matrix, subset = NULL, convert = TRUE)
+median_rank(expression_matrix, subset = NULL, convert = TRUE, weights = NULL)
 }
 \arguments{
 \item{expression_matrix}{expression_matrix a matrix or dataframe with rows as voxels and columns as genes}
@@ -12,6 +12,8 @@ median_rank(expression_matrix, subset = NULL, convert = TRUE)
 \item{subset}{numeric vector of ids to subset matrix to. defaults to NULL (no subset)}
 
 \item{convert}{do 1 - (expression_matrix_rank_median / nrow(expression_matrix)) ?}
+
+\item{weights}{weights for ids}
 }
 \value{
 vector with median ranks per voxel and numeric ids as names
