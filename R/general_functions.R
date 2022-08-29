@@ -232,6 +232,7 @@ findRegions_genesets = function(gene_set,gene_set_weights=NULL,min_ids = 0, aba_
     pct_of_genes_list[[names(gene_set)[i]]] = ids_length / length(unique(gene_set[[i]]))
     if(length(ids_to_query) < 2){
       message("Cannot find any (or only 1) ids for gene in set ",names(gene_set)[i])
+      pct_of_weights_list[[names(gene_set)[i]]] = NA
     }else{
       message("Running ",names(gene_set)[i]," with ",length(ids_to_query)," ids to query.")
       # get expression
