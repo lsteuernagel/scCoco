@@ -15,24 +15,7 @@ query the [Allen brain atlas API](atlas.brain-map.org).
 
 ## Installation
 
-You can install the development version of scCoco like so:
-
-``` r
-# FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
-```
-
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-# scUtils
-
-<!-- badges: start -->
-<!-- badges: end -->
-
-Single-cell utility functions by Lukas Steuernagel
-
-## Installation
-
-Install scUtils using:
+Install scCoco using:
 
 ``` r
 if (!require("remotes", quietly = TRUE))
